@@ -1,0 +1,1 @@
+TinyHarness is a minimal agent harness built from scratch for learning and experimentation.
