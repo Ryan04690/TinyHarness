@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: tinyharness
+Version: 0.1.0
+Summary: A minimal agent harness built from scratch for learning and experimentation.
+Requires-Python: >=3.10
+Requires-Dist: openai
+Requires-Dist: python-dotenv

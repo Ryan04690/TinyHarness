@@ -1,23 +1,21 @@
 import os
-import json
-
 from dotenv import load_dotenv
-from openai import OpenAI
+from tinyharness.models import OpenAICompatibleProvider
 
 load_dotenv()
 
-api_key = os.getenv("DEEPSEEK_API_KEY") 
+api_key = os.getenv("DEEPSEEK_API_KEY")
 
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://api.deepseek.com",
+if not api_key:
+    raise ValueError(
+        "DEEPSEEK_API_KEY is not set."
     )
 
-def add(a,b):
-    return a + b
-
-def multiply(a,b):
-    return a * b    
+model = OpenAICompatibleProvider(
+    model="deepseek-flash",
+    api_key=os.getenv("DEEPSEEK_API_KEY"),
+    base_url="https://api.deepseek.com",
+)
 
 # tools JSON Schema
 tools = [
@@ -67,50 +65,9 @@ tools = [
 
 messages = [
     {
-        "role": "user",
-        "content": "What is 10 plus 20 multiplied by 3?"
+        "role":"user",
+        "content":"what is 1 + 2 ?",
     }
 ]
-
-response = client.chat.completions.create(
-    model="deepseek-flash",
-    messages=messages,
-    tools=tools,
-    stream=False,
-    extra_body={
-        "thinking": {
-            "type":"disabled"
-        },
-    },
-)
-
-message = response.choices[0].message
-print(message.tool_calls)
-
-if message.tool_calls: # 解析调用工具
-    messages.append(message)
-    tool_args = json.loads(message.tool_calls[0].function.arguments)
-    if message.tool_calls[0].function.name == "add":
-        result = add(**tool_args)
-    elif message.tool_calls[0].function.name == "multiply":
-        result = multiply(**tool_args)
-    messages.append({
-        "role": "tool",
-        "tool_call_id": message.tool_calls[0].id,
-        "content": str(result)
-    })
-    second_response = client.chat.completions.create(
-    model="deepseek-flash", 
-    messages=messages,
-    tools=tools,
-    stream=False,
-    extra_body={
-        "thinking": {
-            "type":"disabled"
-        },
-    },
-)
-    final_message = second_response.choices[0].message
-    print(final_message.content)
-else:
-    print(message.content)
+response = model.generate(messages=messages,tools=tools)
+print(response.choices[0].message.tool_calls) # None
