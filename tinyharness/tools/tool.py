@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
+from jsonschema import validate
+
 
 @dataclass
 class Tool:
@@ -17,8 +19,15 @@ class Tool:
                 "parameters":self.parameters,
             },
         }
+    #  Check if the JSON returned by the LLM meets the tool's requirements
+    def validata_arguments(self,arguments):
+        validate(
+            instance=arguments,
+            schema=self.parameters,
+        )
 
     def execute(self,arguments):
+        self.validata_arguments(arguments)
         return self.function(**arguments)
 
 

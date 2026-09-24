@@ -126,6 +126,7 @@ def create_file_tools(project_root):
                     "default": ".",
                 }
             },
+            "additionalProperties": False,
         },
         function=list_files,
     )
@@ -148,6 +149,7 @@ def create_file_tools(project_root):
                 }
             },
             "required": ["path"],
+            "additionalProperties": False,
         },
         function=read_file,
     )
@@ -188,6 +190,7 @@ def create_file_tools(project_root):
                 "path",
                 "content",
             ],
+            "additionalProperties": False,
         },
         function=write_file,
     )

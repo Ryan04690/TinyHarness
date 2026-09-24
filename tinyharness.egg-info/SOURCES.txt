@@ -6,6 +6,13 @@ tinyharness.egg-info/SOURCES.txt
 tinyharness.egg-info/dependency_links.txt
 tinyharness.egg-info/requires.txt
 tinyharness.egg-info/top_level.txt
+tinyharness/agent/__init__.py
+tinyharness/agent/agent.py
+tinyharness/agent/result.py
 tinyharness/models/__init__.py
 tinyharness/models/base.py
 tinyharness/models/openai_compatible.py
+tinyharness/tools/__init__.py
+tinyharness/tools/file_tools.py
+tinyharness/tools/registry.py
+tinyharness/tools/tool.py

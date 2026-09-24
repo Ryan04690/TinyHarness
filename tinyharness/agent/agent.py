@@ -1,27 +1,19 @@
 import json
 
+from jsonschema import ValidationError
+
 from .result import AgentResult
 
 
 class Agent:
-    """
     def __init__(
         self,
         model,
-        tools,
-        tool_functions,
+        tool_registry,
         max_steps=10,
-    ):
-    """
-    def __init__(
-            self,
-            model,
-            tool_registry,
-            max_steps = 10,
     ):
         self.model = model
         self.tool_registry = tool_registry
-        # self.tool_functions = tool_functions
         self.max_steps = max_steps
 
     def run(self, user_input):
@@ -38,12 +30,15 @@ class Agent:
 
             print(f"\n--- Step {step + 1} ---")
 
+            # -------------------------------------------------
             # 1. Ask the model what to do next
+            # -------------------------------------------------
             try:
                 response = self.model.generate(
                     messages=messages,
                     tools=self.tool_registry.schemas(),
                 )
+
             except Exception as error:
                 return AgentResult(
                     status="model_error",
@@ -57,10 +52,14 @@ class Agent:
 
             # Save the assistant message into the trajectory
             messages.append(
-                message.model_dump(exclude_none=True)
+                message.model_dump(
+                    exclude_none=True
+                )
             )
 
-            # 2. No tool call means the model has finished the task
+            # -------------------------------------------------
+            # 2. No tool call means the task is finished
+            # -------------------------------------------------
             if not message.tool_calls:
                 return AgentResult(
                     status="success",
@@ -69,29 +68,40 @@ class Agent:
                     tool_calls=tool_call_count,
                 )
 
-            # 3. Execute every tool call returned in this step
+            # -------------------------------------------------
+            # 3. Execute every tool call returned by the model
+            # -------------------------------------------------
             for tool_call in message.tool_calls:
 
                 tool_call_count += 1
 
                 tool_name = tool_call.function.name
-                raw_arguments = tool_call.function.arguments
+                raw_arguments = (
+                    tool_call.function.arguments
+                )
 
-                # -------------------------------------------------
-                # Parse tool arguments
-                # -------------------------------------------------
+                # ---------------------------------------------
+                # 3.1 Parse JSON arguments
+                # ---------------------------------------------
                 try:
-                    tool_args = json.loads(raw_arguments)
+                    tool_args = json.loads(
+                        raw_arguments
+                    )
 
-                    # Tool arguments should be a JSON object
                     if not isinstance(tool_args, dict):
                         raise ValueError(
-                            "Tool arguments must be a JSON object."
+                            "Tool arguments must be "
+                            "a JSON object."
                         )
 
-                except (json.JSONDecodeError, ValueError) as error:
+                except (
+                    json.JSONDecodeError,
+                    ValueError,
+                ) as error:
                     result = {
-                        "error": "invalid_tool_arguments",
+                        "error": (
+                            "invalid_tool_arguments"
+                        ),
                         "message": str(error),
                     }
 
@@ -101,37 +111,52 @@ class Agent:
                         f"{tool_name}({tool_args})"
                     )
 
-                    # ---------------------------------------------
-                    # Find the corresponding Python function
-                    # ---------------------------------------------
-                    tool = self.tool_registry.get(tool_name)
+                    # -----------------------------------------
+                    # 3.2 Find the Tool
+                    # -----------------------------------------
+                    tool = self.tool_registry.get(
+                        tool_name
+                    )
 
                     if tool is None:
                         result = {
                             "error": "unknown_tool",
                             "message": (
-                                f"Tool '{tool_name}' not found."
+                                f"Tool '{tool_name}' "
+                                "not found."
                             ),
                         }
 
                     else:
-                        # -----------------------------------------
-                        # Execute the tool
-                        # -----------------------------------------
+                        # -------------------------------------
+                        # 3.3 Validate + execute the Tool
+                        # -------------------------------------
                         try:
-                            result = tool.execute(tool_args)
+                            result = tool.execute(
+                                tool_args
+                            )
+
+                        except ValidationError as error:
+                            result = {
+                                "error": (
+                                    "invalid_tool_arguments"
+                                ),
+                                "message": error.message,
+                            }
 
                         except Exception as error:
                             result = {
-                                "error": "tool_execution_error",
+                                "error": (
+                                    "tool_execution_error"
+                                ),
                                 "message": str(error),
                             }
 
                 print(f"Tool result: {result}")
 
-                # -------------------------------------------------
-                # Every tool call MUST receive one tool response
-                # -------------------------------------------------
+                # ---------------------------------------------
+                # 4. Every tool call must receive a tool result
+                # ---------------------------------------------
                 messages.append(
                     {
                         "role": "tool",
@@ -144,7 +169,9 @@ class Agent:
                     }
                 )
 
-        # 4. Agent did not finish within max_steps
+        # -----------------------------------------------------
+        # 5. Agent did not finish within max_steps
+        # -----------------------------------------------------
         return AgentResult(
             status="max_steps",
             content=None,
@@ -155,3 +182,5 @@ class Agent:
                 f"max_steps={self.max_steps}."
             ),
         )
+
+# Return is valid、Can be parsed、The tool exists、Meets the tool schema、Tool executed successfully
