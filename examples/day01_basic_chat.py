@@ -5,7 +5,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-api_key = os.getenv("DEEPSEEK_API_KEY") # 无状态的api 后面可以注意一下历史信息
+api_key = os.getenv("DEEPSEEK_API_KEY") 
 
 client = OpenAI(
     api_key=api_key,

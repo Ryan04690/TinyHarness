@@ -87,7 +87,7 @@ response = client.chat.completions.create(
 message = response.choices[0].message
 print(message.tool_calls)
 
-if message.tool_calls: # 解析调用工具
+if message.tool_calls: # Parsing Call Tool
     messages.append(message)
     tool_args = json.loads(message.tool_calls[0].function.arguments)
     if message.tool_calls[0].function.name == "add":

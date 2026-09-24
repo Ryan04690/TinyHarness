@@ -2,6 +2,6 @@ from abc import ABC, abstractmethod
 
 class ModelProvider(ABC):
 
-    @abstractmethod #该方法是抽象方法，子类必须实现
+    @abstractmethod # This method is abstract, and subclasses have to implement it.
     def generate(self,messages,tools=None):
         pass

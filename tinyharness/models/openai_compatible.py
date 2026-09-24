@@ -10,7 +10,7 @@ class OpenAICompatibleProvider(ModelProvider):
             thinking_enabled=False,
     ):
         self.model = model
-        # self.messages = [] 目前先不需要Provider自己维护messages，交给调用者维护 后面会针对这个开发一个State
+        # self.messages = [] For now, the Provider doesn't need to maintain messages itself; we'll leave it to the caller. Later, we'll develop a State for this.
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
