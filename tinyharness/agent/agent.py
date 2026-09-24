@@ -4,6 +4,7 @@ from .result import AgentResult
 
 
 class Agent:
+    """
     def __init__(
         self,
         model,
@@ -11,9 +12,16 @@ class Agent:
         tool_functions,
         max_steps=10,
     ):
+    """
+    def __init__(
+            self,
+            model,
+            tool_registry,
+            max_steps = 10,
+    ):
         self.model = model
-        self.tools = tools
-        self.tool_functions = tool_functions
+        self.tool_registry = tool_registry
+        # self.tool_functions = tool_functions
         self.max_steps = max_steps
 
     def run(self, user_input):
@@ -34,7 +42,7 @@ class Agent:
             try:
                 response = self.model.generate(
                     messages=messages,
-                    tools=self.tools,
+                    tools=self.tool_registry.schemas(),
                 )
             except Exception as error:
                 return AgentResult(
@@ -96,11 +104,9 @@ class Agent:
                     # ---------------------------------------------
                     # Find the corresponding Python function
                     # ---------------------------------------------
-                    tool_function = self.tool_functions.get(
-                        tool_name
-                    )
+                    tool = self.tool_registry.get(tool_name)
 
-                    if tool_function is None:
+                    if tool is None:
                         result = {
                             "error": "unknown_tool",
                             "message": (
@@ -113,7 +119,7 @@ class Agent:
                         # Execute the tool
                         # -----------------------------------------
                         try:
-                            result = tool_function(**tool_args)
+                            result = tool.execute(tool_args)
 
                         except Exception as error:
                             result = {
