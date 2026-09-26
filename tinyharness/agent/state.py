@@ -12,6 +12,7 @@ class AgentState:
 
     steps: int = 0
     tool_calls: int = 0
+    estimated_input_tokens: int = 0
 
     @classmethod
     def from_user_input(
@@ -38,3 +39,16 @@ class AgentState:
 
     def record_tool_call(self):
         self.tool_calls += 1
+
+    def set_estimated_input_tokens(
+    self,
+    tokens: int,
+):
+        if tokens < 0:
+            raise ValueError(
+                "Token count cannot be negative."
+            )
+
+        self.estimated_input_tokens = (
+            tokens
+        )

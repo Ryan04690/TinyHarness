@@ -4,7 +4,7 @@ from jsonschema import ValidationError
 
 from .result import AgentResult
 from .state import AgentState
-
+from tinyharness.context import ApproxTokenCounter
 
 class Agent:
     def __init__(
@@ -12,10 +12,19 @@ class Agent:
         model,
         tool_registry,
         max_steps=10,
+        token_counter=None,
+        context_budget=None,
+        context_policy=None,
     ):
         self.model = model
         self.tool_registry = tool_registry
         self.max_steps = max_steps
+        self.token_counter = (
+            token_counter          # can switch to the corresponding DeepSeek or OpenAI methods, and so on.
+            or ApproxTokenCounter()
+        )
+        self.context_budget = context_budget
+        self.context_policy = context_policy
 
     def run(self, user_input):
         state = AgentState.from_user_input(
@@ -29,12 +38,113 @@ class Agent:
                 f"{state.steps + 1} ---"
             )
 
+            tool_schemas = (self.tool_registry.schemas())
+
+            model_messages = state.messages # state.messages keeps the completed history
+
+            estimate = (
+                self.token_counter.count_request(
+                    messages=model_messages,
+                    tools=tool_schemas,
+                )
+            )
+
+            state.set_estimated_input_tokens(estimate.total)
+
+            print(
+                "Context estimate: "
+                f"{estimate.total} tokens "
+                f"(messages={estimate.messages}, "
+                f"tools={estimate.tools})"
+            )
+
+            if self.context_budget is not None:
+
+                budget_check = (
+                    self.context_budget.check(
+                        estimate.total
+                    )
+                )
+
+                print(
+                    "Context budget: "
+                    f"{budget_check.input_tokens}/"
+                    f"{budget_check.max_input_tokens} "
+                    f"tokens "
+                    f"({budget_check.usage_ratio:.1%})"
+                )
+
+                if (
+                    not budget_check.within_budget
+                    and self.context_policy
+                    is not None
+                ):
+                    original_count = len(model_messages)
+
+                    model_messages = (
+                        self.context_policy.apply(
+                            messages=state.messages,
+                            tools=tool_schemas,
+                            token_counter=self.token_counter,
+                            context_budget=self.context_budget,
+                        )
+                    )
+
+                    dropped_count = (
+                        original_count
+                        - len(model_messages)
+                    )
+
+                    print(
+                        "Context policy: "
+                        f"dropped "
+                        f"{dropped_count} messages"
+                    )
+
+                    estimate = (
+                        self.token_counter.count_request(
+                            messages=model_messages,
+                            tools=tool_schemas,
+                        )
+                    )
+
+                    state.set_estimated_input_tokens(estimate.total)
+
+                    budget_check = (
+                        self.context_budget.check(
+                            estimate.total
+                        )
+                    )
+
+                    print(
+                        "Context after policy: "
+                        f"{estimate.total}/"
+                        f"{budget_check.max_input_tokens} "
+                        f"tokens "
+                        f"({budget_check.usage_ratio:.1%})"
+                    )
+
+                if not budget_check.within_budget:
+                    return AgentResult(
+                        status="context_overflow",
+                        content=None,
+                        steps=state.steps,
+                        tool_calls=state.tool_calls,
+                        error=(
+                            "Context budget exceeded: "
+                            f"{budget_check.input_tokens} "
+                            f"> "
+                            f"{budget_check.max_input_tokens} "
+                            "estimated input tokens."
+                        ),
+                    )
+
             # ---------------------------------------------
             # 1. Ask the model what to do next
             # ---------------------------------------------
             try:
                 response = self.model.generate(
-                    messages=state.messages,
+                    messages=model_messages,
                     tools=self.tool_registry.schemas(),
                 )
 

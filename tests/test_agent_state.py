@@ -1,4 +1,5 @@
 from tinyharness.agent import AgentState
+import pytest
 
 def test_state_from_user_input():
     state = AgentState.from_user_input(
@@ -59,3 +60,23 @@ def test_states_do_not_share_messages():
 
     assert len(state_a.messages) == 1
     assert len(state_b.messages) == 0
+
+def test_state_tracks_token_estimate():
+    state = AgentState()
+
+    state.set_estimated_input_tokens(
+        1234
+    )
+
+    assert (
+        state.estimated_input_tokens
+        == 1234
+    )
+
+def test_state_rejects_negative_tokens():
+    state = AgentState()
+
+    with pytest.raises(ValueError):
+        state.set_estimated_input_tokens(
+            -1
+        )
