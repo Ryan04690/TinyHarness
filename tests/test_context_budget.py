@@ -42,3 +42,11 @@ def test_context_budget_must_be_positive():
         ContextBudget(
             max_input_tokens=0
         )
+
+def test_context_budget_rejects_negative_input():
+    budget = ContextBudget(
+        max_input_tokens=1000
+    )
+
+    with pytest.raises(ValueError):
+        budget.check(-1)

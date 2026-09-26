@@ -14,7 +14,7 @@ class Agent:
         max_steps=10,
         token_counter=None,
         context_budget=None,
-        context_policy=None,
+        context_policy=None, # able to choose different policy
     ):
         self.model = model
         self.tool_registry = tool_registry
@@ -97,8 +97,8 @@ class Agent:
 
                     print(
                         "Context policy: "
-                        f"dropped "
-                        f"{dropped_count} messages"
+                        f"{original_count} -> "
+                        f"{len(model_messages)} messages"
                     )
 
                     estimate = (

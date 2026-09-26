@@ -1,5 +1,4 @@
-# Mostly the same as day13
-# This test has some issues. The deleted history is completely gone and wasn't sent to the LLM.
+
 
 import os
 
@@ -18,7 +17,8 @@ from tinyharness.tools import (
 )
 from tinyharness.context import (
     ContextBudget,
-    RecentContextPolicy,
+    LLMContextSummarizer,
+    SummaryContextPolicy,
 )
 
 load_dotenv()
@@ -60,8 +60,19 @@ model = OpenAICompatibleProvider(
     base_url="https://api.deepseek.com",
 )
 
-budget = ContextBudget(max_input_tokens=1800)
-policy = RecentContextPolicy()  # Loop delete block without summarizing
+summarizer = (
+    LLMContextSummarizer(
+        model
+    )
+)
+
+policy = SummaryContextPolicy(
+    summarizer=summarizer
+)
+
+budget = ContextBudget(
+    max_input_tokens=2000
+)
 
 agent = Agent(
     model=model,
@@ -73,8 +84,10 @@ agent = Agent(
 result = agent.run(
     (
         "Find the file that defines "
-        "ApproxTokenCounter, read it, "
-        "and explain what fields it stores."
+        "ApproxTokenCounter, inspect how it "
+        "estimates tokens, and explain both "
+        "what state it stores and why UTF-8 "
+        "bytes are used."
     )
 )
 
