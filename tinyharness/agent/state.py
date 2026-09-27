@@ -2,7 +2,7 @@ from dataclasses import (
     dataclass,
     field,
 )
-
+from tinyharness.tracing import ExecutionTrace
 
 @dataclass
 class AgentState:
@@ -13,6 +13,8 @@ class AgentState:
     steps: int = 0
     tool_calls: int = 0
     estimated_input_tokens: int = 0
+
+    trace: ExecutionTrace = field(default_factory=ExecutionTrace) #  Every time a new AgentState is created, again.
 
     @classmethod
     def from_user_input(

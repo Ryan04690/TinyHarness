@@ -1,9 +1,21 @@
-from dataclasses import dataclass
+from dataclasses import (
+    dataclass,
+    field,
+)
+
+from tinyharness.tracing import (
+    ExecutionTrace,
+)
 
 @dataclass
 class AgentResult:
     status: str
-    tool_calls: int
+    content: str | None
     steps: int
-    content: str
+    tool_calls: int
     error: str | None = None
+
+    trace: ExecutionTrace | None = field(
+        default=None,
+        repr=False,
+    )

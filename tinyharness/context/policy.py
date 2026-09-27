@@ -1,4 +1,20 @@
-class RecentContextPolicy:  # Start deleting from the oldest complete interaction block until the Context can fit.
+class RecentContextPolicy:
+    """
+    Start deleting from the oldest complete interaction
+    block until the Context can fit.
+    """
+
+    # -----------------------------------------------------
+    # Split messages into:
+    #
+    # 1. pinned prefix
+    #    - leading system messages
+    #    - initial user request
+    #
+    # 2. removable interaction blocks
+    #    - assistant
+    #    - assistant + corresponding tool results
+    # -----------------------------------------------------
     def _split_messages(
         self,
         messages,
@@ -8,16 +24,17 @@ class RecentContextPolicy:  # Start deleting from the oldest complete interactio
 
         index = 0
 
-        # Preserve leading system messages
+        # Preserve leading system messages.
+        # Laying the groundwork for future development.
         while (
             index < len(messages)
             and messages[index].get("role")
-            == "system"  # Laying the groundwork for future development
+            == "system"
         ):
             prefix.append(messages[index])
             index += 1
 
-        # Preserve the initial user request
+        # Preserve the initial user request.
         if (
             index < len(messages)
             and messages[index].get("role")
@@ -26,24 +43,22 @@ class RecentContextPolicy:  # Start deleting from the oldest complete interactio
             prefix.append(messages[index])
             index += 1
 
-        # Group the remaining trajectory
+        # Group the remaining trajectory.
         while index < len(messages):
-
             message = messages[index]
 
-            if ( message.get("role") == "assistant" ):
+            if (message.get("role")== "assistant"):
                 block = [message]
                 index += 1
 
                 # Tool results belong to the
                 # preceding assistant Tool Call.
+                #
+                # If one assistant message contains
+                # multiple Tool Calls, all following
+                # Tool results stay in the same block.
                 while (
-                    index < len(messages)
-                    and messages[index].get(
-                        "role"
-                    )
-                    == "tool"
-                ):
+                    index < len(messages)and messages[index].get("role")== "tool"):
                     block.append(messages[index])
                     index += 1
 
@@ -55,17 +70,22 @@ class RecentContextPolicy:  # Start deleting from the oldest complete interactio
 
         return prefix, blocks
 
+    # -----------------------------------------------------
+    # Apply Recent Context Policy
+    # -----------------------------------------------------
     def apply(
         self,
         messages,
         tools,
         token_counter,
         context_budget,
+        trace=None,
+        step=None,
     ):
         if not messages:
             return []
 
-        # Never mutate AgentState.messages
+        # Never mutate AgentState.messages.
         original_messages = list(messages)
 
         estimate = (
@@ -77,7 +97,7 @@ class RecentContextPolicy:  # Start deleting from the oldest complete interactio
 
         check = context_budget.check(estimate.total)
 
-        # Already fits: no truncation
+        # Already fits: no truncation.
         if check.within_budget:
             return original_messages
 
@@ -89,8 +109,9 @@ class RecentContextPolicy:  # Start deleting from the oldest complete interactio
 
         remaining_blocks = list(blocks)
 
-        while remaining_blocks:  # Loop
-
+        # Remove the oldest complete interaction
+        # block until the Context can fit.
+        while remaining_blocks:
             candidate = (
                 prefix
                 + [
@@ -116,22 +137,45 @@ class RecentContextPolicy:  # Start deleting from the oldest complete interactio
             ):
                 return candidate
 
-            # Remove the oldest complete block
+            # Remove the oldest complete block.
             remaining_blocks.pop(0)
 
-        # Minimum possible context:
+        # Minimum possible Context:
         # pinned prefix only.
         return list(prefix)
 
 
+class SummaryContextPolicy(
+    RecentContextPolicy
+):
+    """
+    Compress old interaction blocks into a summary
+    instead of simply deleting them.
+    """
 
-class SummaryContextPolicy(RecentContextPolicy):
     def __init__(
         self,
         summarizer,
     ):
         self.summarizer = summarizer
 
+    # -----------------------------------------------------
+    # Flatten:
+    #
+    # [
+    #     [message1, message2],
+    #     [message3, message4],
+    # ]
+    #
+    # into:
+    #
+    # [
+    #     message1,
+    #     message2,
+    #     message3,
+    #     message4,
+    # ]
+    # -----------------------------------------------------
     def _flatten_blocks(
         self,
         blocks,
@@ -142,6 +186,14 @@ class SummaryContextPolicy(RecentContextPolicy):
             for message in block
         ]
 
+    # -----------------------------------------------------
+    # Convert summary text into a normal context message.
+    #
+    # We deliberately use role="assistant" instead of
+    # role="system" because the summary comes from previous
+    # assistant/tool execution history and should not be
+    # promoted to system-level authority.
+    # -----------------------------------------------------
     def _summary_message(
         self,
         summary,
@@ -154,16 +206,58 @@ class SummaryContextPolicy(RecentContextPolicy):
             ),
         }
 
+    # -----------------------------------------------------
+    # Run summarizer and record the summary call in Trace.
+    #
+    # Summary calls are real model calls, but they are
+    # Context Maintenance Calls rather than Agent Decisions.
+    # Therefore they do NOT increment AgentState.steps.
+    # -----------------------------------------------------
+    def _summarize(
+        self,
+        messages,
+        trace=None,
+        step=None,
+    ):
+        if trace is not None:
+            trace.record(
+                "context_summary_start",
+                step=step,
+                source_message_count=(
+                    len(messages)
+                ),
+            )
+
+        summary = (
+            self.summarizer.summarize(messages)
+        )
+
+        if trace is not None:
+            trace.record(
+                "context_summary_end",
+                step=step,
+                source_message_count=(len(messages)),
+                summary=summary,
+            )
+
+        return summary
+
+    # -----------------------------------------------------
+    # Apply Summary Context Policy
+    # -----------------------------------------------------
     def apply(
         self,
         messages,
         tools,
         token_counter,
         context_budget,
+        trace=None,
+        step=None,
     ):
         if not messages:
             return []
 
+        # Never mutate AgentState.messages.
         original_messages = list(messages)
 
         estimate = (
@@ -173,6 +267,7 @@ class SummaryContextPolicy(RecentContextPolicy):
             )
         )
 
+        # Already fits: no summarization.
         if (
             context_budget
             .check(estimate.total)
@@ -181,36 +276,45 @@ class SummaryContextPolicy(RecentContextPolicy):
             return original_messages
 
         prefix, blocks = (
-            self._split_messages(
-                original_messages
-            )
+            self._split_messages(original_messages)
         )
 
         remaining_blocks = list(blocks)
 
         dropped_blocks = []
 
-        while remaining_blocks: # Loop
+        # -------------------------------------------------
+        # Gradually move old blocks into the summary.
+        #
+        # Example:
+        #
+        # USER + A + B + C
+        #
+        # becomes:
+        #
+        # USER + summary(A) + B + C
+        #
+        # If it still does not fit:
+        #
+        # USER + summary(A+B) + C
+        # -------------------------------------------------
+        while remaining_blocks:
             dropped_blocks.append(
                 remaining_blocks.pop(0)
             )
 
             dropped_messages = (
-                self._flatten_blocks(
-                    dropped_blocks
-                )
+                self._flatten_blocks(dropped_blocks)
             )
 
-            summary = (
-                self.summarizer.summarize(
-                    dropped_messages
-                )
+            summary = self._summarize(
+                messages=dropped_messages,
+                trace=trace,
+                step=step,
             )
 
             summary_message = (
-                self._summary_message(
-                    summary
-                )
+                self._summary_message(summary)
             )
 
             candidate = (
@@ -230,50 +334,20 @@ class SummaryContextPolicy(RecentContextPolicy):
 
             if (
                 context_budget
-                .check(
-                    candidate_estimate.total
-                )
+                .check(candidate_estimate.total)
                 .within_budget
             ):
                 return candidate
 
-        # All removable blocks were summarized.
-        if dropped_blocks:
-            dropped_messages = (
-                self._flatten_blocks(
-                    dropped_blocks
-                )
-            )
-
-            summary = (
-                self.summarizer.summarize(
-                    dropped_messages
-                )
-            )
-
-            candidate = (
-                prefix
-                + [
-                    self._summary_message(
-                        summary
-                    )
-                ]
-            )
-
-            estimate = (
-                token_counter.count_request(
-                    messages=candidate,
-                    tools=tools,
-                )
-            )
-
-            if (
-                context_budget
-                .check(estimate.total)
-                .within_budget
-            ):
-                return candidate
-
-        # Even prefix + summary cannot fit.
-        # Fall back to the smallest pinned context.
+        # If we reach here, even:
+        #
+        # prefix + summary(all removable blocks)
+        #
+        # did not fit.
+        #
+        # Do NOT call the summarizer again here.
+        # The last iteration above already summarized
+        # all removable blocks and checked that candidate.
+        #
+        # Fall back to the smallest pinned Context.
         return list(prefix)
