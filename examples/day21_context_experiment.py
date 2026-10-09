@@ -38,19 +38,13 @@ project_root = Path.cwd()
 
 registry = ToolRegistry()
 
-for tool in create_file_tools(
-    project_root
-):
+for tool in create_file_tools(project_root):
     registry.register(tool)
 
-for tool in create_search_tools(
-    project_root
-):
+for tool in create_search_tools(project_root):
     registry.register(tool)
 
-for tool in create_shell_tools(
-    project_root
-):
+for tool in create_shell_tools(project_root):
     registry.register(tool)
 
 
@@ -86,45 +80,25 @@ def analyze_trace(
 ):
     trace = result.trace
 
-    model_calls = len(
-        trace.by_type(
-            "model_call_start"
-        )
-    )
+    model_calls = len(trace.by_type("model_call_start"))
 
-    summary_calls = len(
-        trace.by_type(
-            "context_summary_start"
-        )
-    )
+    summary_calls = len(trace.by_type("context_summary_start"))
 
-    policy_events = trace.by_type(
-        "context_policy"
-    )
+    policy_events = trace.by_type("context_policy")
 
     overflow_checks = [
         event
-        for event in trace.by_type(
-            "budget_check"
-        )
-        if not event.data[
-            "within_budget"
-        ]
+        for event in trace.by_type("budget_check")
+        if not event.data["within_budget"]
     ]
 
-    context_estimates = (
-        trace.by_type(
-            "context_estimate"
-        )
-    )
+    context_estimates = (trace.by_type("context_estimate"))
 
     peak_context = 0
 
     if context_estimates:
         peak_context = max(
-            event.data[
-                "total_tokens"
-            ]
+            event.data["total_tokens"]
             for event
             in context_estimates
         )
@@ -293,11 +267,7 @@ print(
     "################################"
 )
 
-result_summary = (
-    summary_agent.run(
-        PROMPT
-    )
-)
+result_summary = (summary_agent.run(PROMPT))
 
 analyze_trace(
     "Summary Context Policy",
@@ -314,24 +284,10 @@ def summary_row(
         "name": name,
         "status": result.status,
         "steps": result.steps,
-        "tool_calls": (
-            result.tool_calls
-        ),
-        "model_calls": len(
-            trace.by_type(
-                "model_call_start"
-            )
-        ),
-        "summary_calls": len(
-            trace.by_type(
-                "context_summary_start"
-            )
-        ),
-        "policy_calls": len(
-            trace.by_type(
-                "context_policy"
-            )
-        ),
+        "tool_calls": (result.tool_calls),
+        "model_calls": len(trace.by_type("model_call_start")),
+        "summary_calls": len(trace.by_type("context_summary_start")),
+        "policy_calls": len(trace.by_type("context_policy")),
     }
 
 
