@@ -25,7 +25,7 @@ class FileEntry:
     type: str
 
 
-class Workspace(ABC):
+class Workspace(ABC):  # How these abilities are achieved is up to the specific subclasses.
     """
     Abstract execution environment for TinyHarness.
 
