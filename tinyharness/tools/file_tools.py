@@ -1,199 +1,138 @@
-# File Tools already has its own path boundaries. But not SandBox
-
-from pathlib import Path
 from .tool import Tool
 
-def create_file_tools(project_root):
-    root = Path(project_root).resolve()
 
-    def resolve_path(path):
-        target = (root / path).resolve()
+def create_file_tools(workspace):  #Deleted resolve_path()  Path security should now belong to workspace
 
-        try:
-            target.relative_to(root)
-        except ValueError:
-            raise ValueError(
-                f"Path '{path}' is outside the project root."
-            )
-
-        return target
-    
     def list_files(path="."):
-        target = resolve_path(path)
 
-        if not target.exists():
-            raise FileExistsError(
-                f"Path '{path}' is not a directory."
-            )
-        entries = []
-
-        for items in sorted(target.iterdir()):
-            entries.append(
-                {
-                    "name":items.name,
-                    "path":str(
-                        items.relative_to(root)
-                    ),
-                    "type":(
-                        "directory"
-                        if items.is_dir()
-                        else "file"
-                    ),
-                }
-            )
+        entries = workspace.list_files(path)
 
         return {
-            "path":str(
-                target.relative_to(root)
-            ),
-            "entries":entries,
+            "path": path,
+            "entries": [
+                {
+                    "name": e.name,
+                    "path": e.path,
+                    "type": e.type,
+                }
+                for e in entries
+            ],
         }
+
 
     def read_file(path):
-        target = resolve_path(path)
 
-        if not target.exists():
-            raise FileNotFoundError(
-                f"File '{path}' does not exist."
-            )
-
-        if not target.is_file():
-            raise IsADirectoryError(
-                f"Path '{path}' is not a file."
-            )
-
-        content = target.read_text(
-            encoding="utf-8"
-        )
+        content = workspace.read_file(path)
 
         return {
-            "path": str(
-                target.relative_to(root)
-            ),
+            "path": path,
             "content": content,
         }
+
 
     def write_file(
         path,
         content,
         overwrite=False,
     ):
-        target = resolve_path(path)
 
-        existed_before = target.exists()
+        if not overwrite:
 
-        if existed_before and not overwrite:
-            raise FileExistsError(
-                f"File '{path}' already exists. "
-                "Set overwrite=true to replace it."
-            )
+            try:
+                workspace.read_file(path)
 
-        target.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+                raise FileExistsError(
+                    f"File '{path}' already exists."
+                )
 
-        characters_written = target.write_text(
+            except FileNotFoundError:
+                pass
+
+
+        workspace.write_file(
+            path,
             content,
-            encoding="utf-8",
         )
+
 
         return {
-            "path": str(
-                target.relative_to(root)
-            ),
-            "characters_written": (
-                characters_written
-            ),
-            "overwritten": existed_before,
+            "path": path,
+            "characters_written": len(content),
+            "overwritten": overwrite,
         }
+
 
     list_files_tool = Tool(
         name="list_files",
         description=(
             "List files and directories inside "
-            "the project workspace."
+            "the workspace."
         ),
         parameters={
             "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": (
-                        "Directory path relative "
-                        "to the project root."
-                    ),
-                    "default": ".",
+            "properties":{
+                "path":{
+                    "type":"string",
+                    "default":".",
                 }
             },
-            "additionalProperties": False,
+            "additionalProperties":False,
         },
         function=list_files,
     )
 
+
     read_file_tool = Tool(
         name="read_file",
         description=(
-            "Read a UTF-8 text file inside "
-            "the project workspace."
+            "Read a text file inside "
+            "the workspace."
         ),
         parameters={
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": (
-                        "File path relative "
-                        "to the project root."
-                    ),
+            "type":"object",
+            "properties":{
+                "path":{
+                    "type":"string",
                 }
             },
-            "required": ["path"],
-            "additionalProperties": False,
+            "required":[
+                "path"
+            ],
+            "additionalProperties":False,
         },
         function=read_file,
     )
 
+
     write_file_tool = Tool(
         name="write_file",
         description=(
-            "Write a UTF-8 text file inside "
-            "the project workspace."
+            "Write a text file inside "
+            "the workspace."
         ),
         parameters={
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": (
-                        "File path relative "
-                        "to the project root."
-                    ),
+            "type":"object",
+            "properties":{
+                "path":{
+                    "type":"string",
                 },
-                "content": {
-                    "type": "string",
-                    "description": (
-                        "Complete text content "
-                        "to write to the file."
-                    ),
+                "content":{
+                    "type":"string",
                 },
-                "overwrite": {
-                    "type": "boolean",
-                    "description": (
-                        "Whether an existing file "
-                        "may be overwritten."
-                    ),
-                    "default": False,
+                "overwrite":{
+                    "type":"boolean",
+                    "default":False,
                 },
             },
-            "required": [
+            "required":[
                 "path",
                 "content",
             ],
-            "additionalProperties": False,
+            "additionalProperties":False,
         },
         function=write_file,
     )
+
 
     return [
         list_files_tool,

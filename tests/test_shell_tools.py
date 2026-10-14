@@ -4,19 +4,23 @@ from tinyharness.tools import (
     ToolRegistry,
     create_shell_tools,
 )
+from tinyharness.workspace import LocalWorkspace
 
-
-def create_registry(root):
+def create_registry(workspace):
     registry = ToolRegistry()
 
-    for tool in create_shell_tools(root):
+    for tool in create_shell_tools(workspace):
         registry.register(tool)
 
     return registry
 
 def test_shell_success(tmp_path):
-    registry = create_registry(
+    workspace = LocalWorkspace(
         tmp_path
+    )
+
+    registry = create_registry(
+        workspace
     )
 
     result = registry.execute(
@@ -33,8 +37,12 @@ def test_shell_success(tmp_path):
 def test_shell_nonzero_returncode(
     tmp_path,
 ):
-    registry = create_registry(
+    workspace = LocalWorkspace(
         tmp_path
+    )
+
+    registry = create_registry(
+        workspace
     )
 
     command = (
@@ -54,8 +62,12 @@ def test_shell_nonzero_returncode(
     assert result["timed_out"] is False
 
 def test_shell_timeout(tmp_path):
-    registry = create_registry(
+    workspace = LocalWorkspace(
         tmp_path
+    )
+
+    registry = create_registry(
+        workspace
     )
 
     command = (
@@ -81,10 +93,13 @@ import pytest
 def test_shell_blocks_parent_cwd(
     tmp_path,
 ):
-    registry = create_registry(
+    workspace = LocalWorkspace(
         tmp_path
     )
 
+    registry = create_registry(
+        workspace
+    )
     with pytest.raises(ValueError):
         registry.execute(
             "run_shell",

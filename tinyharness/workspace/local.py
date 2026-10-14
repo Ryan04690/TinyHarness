@@ -85,21 +85,33 @@ class LocalWorkspace(Workspace):
         workdir = self._resolve_path(cwd)
 
 
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        try:
+            result = subprocess.run(
+                command,
+                cwd=workdir,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+
+            return CommandResult(
+                command=command,
+                cwd=str(workdir),
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                timed_out=False,
+            )
 
 
-        return CommandResult(
-            command=command,
-            cwd=str(workdir),
-            returncode=result.returncode,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            timed_out=False,
-        )
+        except subprocess.TimeoutExpired as e:
+
+            return CommandResult(
+                command=command,
+                cwd=str(workdir),
+                returncode=None,
+                stdout=e.stdout or "",
+                stderr=e.stderr or "",
+                timed_out=True,
+            )
