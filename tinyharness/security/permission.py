@@ -1,6 +1,6 @@
 from enum import Enum
 
-
+# Filesystem Network Process Isolation
 class PermissionAction(str, Enum):
 
     READ = "read"

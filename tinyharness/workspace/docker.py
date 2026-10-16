@@ -34,6 +34,8 @@ class DockerWorkspace(Workspace):
                 "docker",
                 "run",
                 "-dit",
+                "--network",
+                "none",
                 self.image,
                 "bash",
             ],
